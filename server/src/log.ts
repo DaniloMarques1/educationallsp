@@ -13,3 +13,7 @@ export default {
     log.write('\n');
   },
 };
+
+export interface Log {
+  write(message: object | unknown): void;
+}

@@ -1,4 +1,4 @@
-import log from './log';
+import log, { Log } from './log';
 import { initialize } from './methods/initialize';
 import { completion } from './methods/completion';
 
@@ -12,52 +12,82 @@ export interface RequestMessage extends Message {
   params: unknown[] | object;
 }
 
-const methodLookup = {
-  initialize: initialize,
-  'textDocument/completion': completion,
-};
+class LspServer {
+  private readonly SEPARATOR = `\r\n\r\n`;
+  private buffer: string = '';
+  private log: Log;
 
-let buffer = '';
-process.stdin.on('data', (chunck: Buffer) => {
-  log.write(chunck.toString());
+  private readonly methodLookup = {
+    initialize: initialize,
+    'textDocument/completion': completion,
+  };
 
-  const message = chunck.toString();
-  const endOfContentLength = message.indexOf(`\r\n\r\n`);
-  const contentLength = getContentLength(
-    message.substring(0, endOfContentLength),
-  );
+  constructor(log: Log) {
+    this.log = log;
+  }
 
-  const startOfMessage = endOfContentLength + 4;
-  const rawMessage = message.substring(startOfMessage);
-  buffer += rawMessage;
+  run() {
+    process.stdin.on('data', (chunk: Buffer) => this.receive(chunk));
+  }
 
-  // if we have not received enought bytes yet we will wait
-  if (contentLength < buffer.length) return;
+  // we just need to read the message where the first part if the content length and the second is the message itself
+  private receive(chunck: Buffer) {
+    const message = chunck.toString();
+    this.log.write(message);
 
-  const request = parseMessage(buffer);
-  const method = methodLookup[request.method];
+    const endOfContentLengthIndex = message.indexOf(this.SEPARATOR);
+    const contentLength = this.getContentLength(
+      message.substring(0, endOfContentLengthIndex),
+    );
+    const startOfMessageIndex = endOfContentLengthIndex + this.SEPARATOR.length;
+    const msgBody = message.substring(startOfMessageIndex);
+    this.buffer += msgBody;
 
-  if (method) respond(request.id, method(request));
+    // not ready yet
+    if (msgBody.length < contentLength) return;
 
-  // restarting buffer
-  buffer = '';
-});
+    const requestMessage = this.getRequestMessage(this.buffer);
 
-function parseMessage(message: string): RequestMessage {
-  const jsonMessage = JSON.parse(message);
-  return jsonMessage as RequestMessage;
+    this.process(requestMessage);
+  }
+
+  private process(requestMessage: RequestMessage) {
+    const method = this.methodLookup[requestMessage.method];
+    if (method) {
+      const result = method(requestMessage);
+      this.respond(requestMessage.id, result);
+      this.buffer = '';
+    }
+  }
+
+  private getContentLength(contentLengthLine: string): number {
+    try {
+      const arr = contentLengthLine.split(' ');
+      return Number.parseInt(arr[1]);
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  private getRequestMessage(message: string): RequestMessage {
+    const jsonMessage = JSON.parse(message);
+    return jsonMessage as RequestMessage;
+  }
+
+  private respond(id: number | string, result: object) {
+    const body = JSON.stringify({ id, result });
+    const responseContentLength = body.length;
+    const header = `Content-Length: ${responseContentLength}${this.SEPARATOR}`;
+    const response = `${header}${body}`;
+
+    this.log.write(response);
+    process.stdout.write(response);
+  }
 }
 
-function getContentLength(contentLengthLine: string) {
-  const arr = contentLengthLine.split(' ');
-  return Number.parseInt(arr[1]);
+function main() {
+  const lspServer = new LspServer({ write: log.write });
+  lspServer.run();
 }
 
-function respond(id: number | string, result: object) {
-  const message = JSON.stringify({ id, result });
-  const responseContentLength = message.length;
-  const header = `Content-Length: ${responseContentLength}\r\n\r\n`;
-  const response = `${header}${message}`;
-
-  process.stdout.write(response);
-}
+main();
