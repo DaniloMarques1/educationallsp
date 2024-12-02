@@ -8,6 +8,7 @@ interface InitializeResult {
 interface ServerCapabilities {
   definitionProvider: boolean;
   completionProvider: object;
+  textDocumentSync: number;
 }
 
 interface ServerInfo {
@@ -24,6 +25,7 @@ export const initialize = (message: RequestMessage): InitializeResult => {
     capabilities: {
       definitionProvider: true,
       completionProvider: {},
+      textDocumentSync: 1,
     },
   };
 

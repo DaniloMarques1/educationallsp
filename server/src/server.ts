@@ -1,15 +1,19 @@
 import log, { Log } from './log';
 import { initialize } from './methods/initialize';
 import { completion } from './methods/completion';
+import { didChange } from './methods/completion';
 
 interface Message {
   jsonrpc: string;
 }
 
-export interface RequestMessage extends Message {
-  id: number | string;
+export interface NotificationMessage extends Message {
   method: string;
   params: unknown[] | object;
+}
+
+export interface RequestMessage extends NotificationMessage {
+  id: number | string;
 }
 
 class LspServer {
@@ -20,6 +24,7 @@ class LspServer {
   private readonly methodLookup = {
     initialize: initialize,
     'textDocument/completion': completion,
+    'textDocument/didChange': didChange,
   };
 
   constructor(log: Log) {
@@ -47,6 +52,7 @@ class LspServer {
     if (msgBody.length < contentLength) return;
 
     const requestMessage = this.getRequestMessage(this.buffer);
+    if (!requestMessage) return;
 
     this.process(requestMessage);
   }
@@ -55,7 +61,10 @@ class LspServer {
     const method = this.methodLookup[requestMessage.method];
     if (method) {
       const result = method(requestMessage);
-      this.respond(requestMessage.id, result);
+      // if it is a notification message, we do not have any response
+      if (result) {
+        this.respond(requestMessage.id, result);
+      }
       this.buffer = '';
     }
   }
@@ -69,9 +78,14 @@ class LspServer {
     }
   }
 
-  private getRequestMessage(message: string): RequestMessage {
-    const jsonMessage = JSON.parse(message);
-    return jsonMessage as RequestMessage;
+  private getRequestMessage(message: string): RequestMessage | null {
+    try {
+      const jsonMessage = JSON.parse(message);
+      return jsonMessage as RequestMessage;
+    } catch (err) {
+      this.log.write(err);
+      return null;
+    }
   }
 
   private respond(id: number | string, result: object) {
