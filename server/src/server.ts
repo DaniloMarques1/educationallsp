@@ -1,7 +1,8 @@
 import log, { Log } from './log';
-import { initialize } from './methods/initialize';
-import { completion } from './methods/completion';
-import { didChange } from './methods/completion';
+import { InitializeCapability } from './capabilities/initialize';
+import { CompletionCapability } from './capabilities/completion';
+import { Capability } from './capabilities/capabilities';
+import { didChange } from './capabilities/did-change';
 
 interface Message {
   jsonrpc: string;
@@ -21,14 +22,25 @@ class LspServer {
   private buffer: string = '';
   private log: Log;
 
-  private readonly methodLookup = {
-    initialize: initialize,
-    'textDocument/completion': completion,
-    'textDocument/didChange': didChange,
-  };
-
   constructor(log: Log) {
     this.log = log;
+  }
+
+  // TODO: maybe turn this into a lookup?
+  private getCapabilityFromMethod(
+    method: string,
+  ): Capability<RequestMessage | NotificationMessage> | null {
+    this.log.write(`searching method for ${method}`);
+    switch (method) {
+      case 'initialize': {
+        return new InitializeCapability();
+      }
+      case 'textDocument/completion': {
+        return new CompletionCapability();
+      }
+      default:
+        return null;
+    }
   }
 
   run() {
@@ -52,20 +64,24 @@ class LspServer {
     if (msgBody.length < contentLength) return;
 
     const requestMessage = this.getRequestMessage(this.buffer);
+    this.buffer = '';
+    this.log.write(`request for ${requestMessage?.method}`);
     if (!requestMessage) return;
 
     this.process(requestMessage);
   }
 
   private process(requestMessage: RequestMessage) {
-    const method = this.methodLookup[requestMessage.method];
-    if (method) {
-      const result = method(requestMessage);
+    const capability = this.getCapabilityFromMethod(requestMessage.method);
+    this.log.write(
+      `found method ${JSON.stringify(capability)} for ${requestMessage.method}`,
+    );
+    if (capability) {
+      const result = capability.process(requestMessage);
       // if it is a notification message, we do not have any response
-      if (result) {
-        this.respond(requestMessage.id, result);
+      if (result && result.message) {
+        this.respond(result.message);
       }
-      this.buffer = '';
     }
   }
 
@@ -81,18 +97,18 @@ class LspServer {
   private getRequestMessage(message: string): RequestMessage | null {
     try {
       const jsonMessage = JSON.parse(message);
-      return jsonMessage as RequestMessage;
+      return jsonMessage;
     } catch (err) {
-      this.log.write(err);
+      this.log.write(`Error is ${err.message}`);
       return null;
     }
   }
 
-  private respond(id: number | string, result: object) {
-    const body = JSON.stringify({ id, result });
-    const responseContentLength = body.length;
+  private respond(result: string) {
+    this.log.write(`result ${JSON.stringify(result)}`);
+    const responseContentLength = result.length;
     const header = `Content-Length: ${responseContentLength}${this.SEPARATOR}`;
-    const response = `${header}${body}`;
+    const response = `${header}${result}`;
 
     this.log.write(response);
     process.stdout.write(response);

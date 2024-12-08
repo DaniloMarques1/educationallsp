@@ -1,5 +1,6 @@
 import { NotificationMessage } from '../server';
 import { documents } from '../documents';
+import { Capability, Response } from './capabilities';
 
 interface TextDocumentIdentifier {
   uri: string;
@@ -22,3 +23,11 @@ export const didChange = (message: NotificationMessage): void => {
   const params = message.params as DidChangeTextDocumentParams;
   documents.set(params.textDocument.uri, params.contentChanges[0].text);
 };
+
+export class DidChangeCapability implements Capability<NotificationMessage> {
+  process(message: NotificationMessage): Response | null {
+    const params = message.params as DidChangeTextDocumentParams;
+    documents.set(params.textDocument.uri, params.contentChanges[0].text);
+    return null;
+  }
+}
