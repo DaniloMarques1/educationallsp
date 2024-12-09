@@ -1,7 +1,8 @@
 import { RequestMessage } from '../server';
 import * as fs from 'fs';
-import { DocumentUri } from '../documents';
+import { documents, DocumentUri } from '../documents';
 import { Capability, Response } from '../capabilities/capabilities';
+import log from '../log';
 
 const words = fs.readFileSync('/usr/share/dict/words').toString().split('\n');
 
@@ -14,23 +15,42 @@ interface CompletionItem {
   label: string;
 }
 
-interface CompletionParams {
-  textDocument: DocumentUri;
+interface TextDocumentIdentifier {
+  uri: DocumentUri;
 }
+interface Position {
+  line: number;
+  character: number;
+}
+
+interface TextDocumentPositionParams {
+  textDocument: TextDocumentIdentifier;
+  position: Position;
+}
+
+interface CompletionParams extends TextDocumentPositionParams {}
 
 export class CompletionCapability implements Capability<RequestMessage> {
   process(message: RequestMessage): Response | null {
     const params = message.params as CompletionParams;
-    let count = 0;
-    const items = new Array<CompletionItem>();
-    for (const word of words) {
-      if (count == 100) break;
+    const documentUri = params.textDocument.uri;
+    const content = documents.get(documentUri);
+    if (content == null || content?.length === 0) return null;
 
-      items.push({
-        label: word,
+    const currentLine = content.split('\n')[params.position.line];
+    const lineUntilCursor = currentLine.slice(0, params.position.character);
+    const currentWordUnderCursor = lineUntilCursor.replace(/.*\W(.*?)/, '$1');
+    log.write(`bro line ${lineUntilCursor}`);
+    log.write(`bro word ${currentWordUnderCursor}`);
+
+    const items: Array<CompletionItem> = words
+      .filter((word) => {
+        return word.startsWith(currentWordUnderCursor);
+      })
+      .slice(0, 1000)
+      .map((word) => {
+        return { label: word };
       });
-      count++;
-    }
 
     const completionList: CompletionList = {
       isIncomplete: true,

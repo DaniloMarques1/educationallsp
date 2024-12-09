@@ -2,7 +2,7 @@ import log, { Log } from './log';
 import { InitializeCapability } from './capabilities/initialize';
 import { CompletionCapability } from './capabilities/completion';
 import { Capability } from './capabilities/capabilities';
-import { didChange } from './capabilities/did-change';
+import { DidChangeCapability } from './capabilities/did-change';
 
 interface Message {
   jsonrpc: string;
@@ -38,6 +38,9 @@ class LspServer {
       case 'textDocument/completion': {
         return new CompletionCapability();
       }
+      case 'textDocument/didChange': {
+        return new DidChangeCapability();
+      }
       default:
         return null;
     }
@@ -63,7 +66,7 @@ class LspServer {
     // not ready yet
     if (msgBody.length < contentLength) return;
 
-    const requestMessage = this.getRequestMessage(this.buffer);
+    const requestMessage = this.getRequestMessage();
     this.buffer = '';
     this.log.write(`request for ${requestMessage?.method}`);
     if (!requestMessage) return;
@@ -94,9 +97,10 @@ class LspServer {
     }
   }
 
-  private getRequestMessage(message: string): RequestMessage | null {
+  private getRequestMessage(): RequestMessage | null {
+    this.log.write(`received this buffer ${JSON.stringify(this.buffer)}`);
     try {
-      const jsonMessage = JSON.parse(message);
+      const jsonMessage = JSON.parse(this.buffer);
       return jsonMessage;
     } catch (err) {
       this.log.write(`Error is ${err.message}`);
@@ -105,12 +109,9 @@ class LspServer {
   }
 
   private respond(result: string) {
-    this.log.write(`result ${JSON.stringify(result)}`);
     const responseContentLength = result.length;
     const header = `Content-Length: ${responseContentLength}${this.SEPARATOR}`;
     const response = `${header}${result}`;
-
-    this.log.write(response);
     process.stdout.write(response);
   }
 }
