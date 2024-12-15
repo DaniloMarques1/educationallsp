@@ -17,6 +17,11 @@ export interface RequestMessage extends NotificationMessage {
   id: number | string;
 }
 
+type CapabilityLookup = Record<
+  string,
+  Capability<RequestMessage | NotificationMessage>
+>;
+
 class LspServer {
   private readonly SEPARATOR = `\r\n\r\n`;
   private buffer: string = '';
@@ -26,24 +31,17 @@ class LspServer {
     this.log = log;
   }
 
-  // TODO: maybe turn this into a lookup?
+  private methods: CapabilityLookup = {
+    initialize: new InitializeCapability(),
+    'textDocument/completion': new CompletionCapability(),
+    'textDocument/didChange': new DidChangeCapability(),
+  };
+
   private getCapabilityFromMethod(
     method: string,
   ): Capability<RequestMessage | NotificationMessage> | null {
     this.log.write(`searching method for ${method}`);
-    switch (method) {
-      case 'initialize': {
-        return new InitializeCapability();
-      }
-      case 'textDocument/completion': {
-        return new CompletionCapability();
-      }
-      case 'textDocument/didChange': {
-        return new DidChangeCapability();
-      }
-      default:
-        return null;
-    }
+    return this.methods[method];
   }
 
   run() {
