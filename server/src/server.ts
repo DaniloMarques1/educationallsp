@@ -51,7 +51,7 @@ class LspServer {
   // we just need to read the message where the first part if the content length and the second is the message itself
   private receive(chunck: Buffer) {
     const message = chunck.toString();
-    this.log.write(message);
+    this.log.write(message); // fitz
 
     const endOfContentLengthIndex = message.indexOf(this.SEPARATOR);
     const contentLength = this.getContentLength(
@@ -66,7 +66,6 @@ class LspServer {
 
     const requestMessage = this.getRequestMessage();
     this.buffer = '';
-    this.log.write(`request for ${requestMessage?.method}`);
     if (!requestMessage) return;
 
     this.process(requestMessage);
@@ -74,9 +73,6 @@ class LspServer {
 
   private process(requestMessage: RequestMessage) {
     const capability = this.getCapabilityFromMethod(requestMessage.method);
-    this.log.write(
-      `found method ${JSON.stringify(capability)} for ${requestMessage.method}`,
-    );
     if (capability) {
       const result = capability.process(requestMessage);
       // if it is a notification message, we do not have any response
@@ -96,7 +92,6 @@ class LspServer {
   }
 
   private getRequestMessage(): RequestMessage | null {
-    this.log.write(`received this buffer ${JSON.stringify(this.buffer)}`);
     try {
       const jsonMessage = JSON.parse(this.buffer);
       return jsonMessage;
