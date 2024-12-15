@@ -2,7 +2,7 @@ import { RequestMessage } from '../server';
 import * as fs from 'fs';
 import { documents, DocumentUri } from '../documents';
 import { Capability, Response } from '../capabilities/capabilities';
-import log from '../log';
+import { Position } from './types';
 
 const words = fs.readFileSync('/usr/share/dict/words').toString().split('\n');
 
@@ -17,10 +17,6 @@ interface CompletionItem {
 
 interface TextDocumentIdentifier {
   uri: DocumentUri;
-}
-interface Position {
-  line: number;
-  character: number;
 }
 
 interface TextDocumentPositionParams {

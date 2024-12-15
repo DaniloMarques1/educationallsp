@@ -9,6 +9,7 @@ interface InitializeResult {
 interface ServerCapabilities {
   definitionProvider: boolean;
   completionProvider: object;
+  diagnosticProvider: object;
   textDocumentSync: number;
 }
 
@@ -29,6 +30,10 @@ export class InitializeCapability implements Capability<RequestMessage> {
         definitionProvider: true,
         completionProvider: {},
         textDocumentSync: 1,
+        diagnosticProvider: {
+          interfileDependencies: false,
+          workspaceDiagnostic: false,
+        },
       },
     };
 

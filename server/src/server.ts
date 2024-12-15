@@ -3,6 +3,7 @@ import { InitializeCapability } from './capabilities/initialize';
 import { CompletionCapability } from './capabilities/completion';
 import { Capability } from './capabilities/capabilities';
 import { DidChangeCapability } from './capabilities/did-change';
+import { DiagnosticCapability } from './capabilities/diagnostic';
 
 interface Message {
   jsonrpc: string;
@@ -35,6 +36,7 @@ class LspServer {
     initialize: new InitializeCapability(),
     'textDocument/completion': new CompletionCapability(),
     'textDocument/didChange': new DidChangeCapability(),
+    'textDocument/diagnostic': new DiagnosticCapability(),
   };
 
   private getCapabilityFromMethod(
@@ -105,6 +107,7 @@ class LspServer {
     const responseContentLength = result.length;
     const header = `Content-Length: ${responseContentLength}${this.SEPARATOR}`;
     const response = `${header}${result}`;
+    this.log.write(response);
     process.stdout.write(response);
   }
 }
